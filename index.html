@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Desktop Acceso seguro.</title>
+<style>
+    body {
+        margin:0;
+        background:#1e1e1e;
+        font-family:Arial;
+        user-select:none;
+        overflow:hidden;
+    }
+    #desktop {
+        width:100vw;
+        height:100vh;
+        position:relative;
+    }
+    .icon {
+        width:70px;
+        text-align:center;
+        color:white;
+        cursor:pointer;
+        margin:20px;
+    }
+    .window {
+        width:420px;
+        height:300px;
+        background:#2b2b2b;
+        color:white;
+        border:1px solid #555;
+        border-radius:6px;
+        position:absolute;
+        display:none;
+        flex-direction:column;
+        top:100px;
+        left:100px;
+        opacity:0;
+        transition:0.25s;
+    }
+    .titlebar {
+        background:#444;
+        padding:5px;
+        cursor:move;
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+    }
+    .closeBtn {
+        width:18px; height:18px;
+        background:#ff5c5c;
+        border-radius:50%;
+        cursor:pointer;
+    }
+    #notes-content, #darknet-content {
+        padding:10px;
+        flex:1;
+        overflow:auto;
+        font-size:14px;
+    }
+    #terminal-output {
+        height:150px;
+        overflow:auto;
+        background:#111;
+        color:#0f0;
+        padding:5px;
+        font-family:monospace;
+        margin-bottom:5px;
+    }
+    #terminal-input {
+        width:75%;
+        padding:5px;
+        background:#222;
+        border:1px solid #555;
+        color:white;
+    }
+    button {
+        padding:5px 10px;
+    }
+</style>
+</head>
+<body>
+
+<div id="desktop">
+
+    <!-- Icons -->
+    <div id="notes-icon" class="icon">
+        <img src="https://i.goopics.net/ag93r0.png" style="width:50px;height:50px;background:#77777700;">
+        <div>Notes</div>
+    </div>
+
+    <div id="darknet-icon" class="icon">
+        <img src="https://i.goopics.net/ddh5cp.png" style="width:50px;height:50px;background:#55555500;">
+        <div>Darknet</div>
+    </div>
+
+    <!-- NOTES WINDOW -->
+    <div id="notes-window" class="window">
+        <div class="titlebar">
+            Notes
+            <div class="closeBtn" onclick="closeWin(notesWin)"></div>
+        </div>
+        <div id="notes-content">
+            <b>Cartel Madrazo</b><br><br>
+            El Cartel Madrazo desea reunirse con ustedes. Para garantizar la confidencialidad y evitar cualquier tipo de vigilancia, el primer punto de contacto se realizará únicamente a través de esta mensajería segura.<br>
+
+Cada grupo involucrado debe confirmar su disponibilidad utilizando su código interno, correspondiente a su nombre en mayúsculas.<br>
+Si el nombre de su grupo contiene espacios, sustitúyanlos por guiones.<br>
+<br>
+El objetivo de este primer contacto es coordinar los intercambios iniciales y preparar las bases para una colaboración más estrecha. No se autoriza ningún contacto directo antes de la confirmación por esta mensajería.<br>
+<br>
+Comandos disponibles en el terminal:<br>
+access [CODE]<br>
+confirm<br>
+finalize<br>
+<br>
+Grupos implicados:<br>
+VAGOS<br>
+AZTECAS<br>
+SERRANA-DE-HUANTA<br>
+LOCO-SYNDICATE<br>
+        </div>
+    </div>
+
+    <!-- DARKNET WINDOW -->
+    <div id="darknet-window" class="window">
+        <div class="titlebar">
+            Darknet Terminal
+            <div class="closeBtn" onclick="closeWin(darknetWin)"></div>
+        </div>
+
+        <div id="darknet-content">
+            <div id="terminal-output"></div>
+            <input id="terminal-input" type="text">
+            <button id="terminal-run">Run</button>
+        </div>
+    </div>
+
+</div>
+
+<script>
+// ===== DRAGGABLE =====
+function makeDraggable(element) {
+    const bar = element.querySelector(".titlebar");
+    let offsetX=0, offsetY=0, dragging=false;
+
+    bar.addEventListener("mousedown", e=>{
+        dragging=true;
+        offsetX = e.clientX - element.offsetLeft;
+        offsetY = e.clientY - element.offsetTop;
+    });
+
+    document.addEventListener("mousemove", e=>{
+        if(!dragging) return;
+        element.style.left = (e.clientX - offsetX) + "px";
+        element.style.top = (e.clientY - offsetY) + "px";
+    });
+    document.addEventListener("mouseup", ()=> dragging=false);
+}
+
+// ===== WINDOWS =====
+const notesWin = document.getElementById("notes-window");
+const darknetWin = document.getElementById("darknet-window");
+
+function openWin(win) {
+    win.style.display = "flex";
+    setTimeout(()=> win.style.opacity = "1", 5);
+}
+function closeWin(win) {
+    win.style.opacity = "0";
+    setTimeout(()=> win.style.display = "none", 200);
+}
+
+// Icons open windows
+document.getElementById("notes-icon").onclick = ()=> openWin(notesWin);
+document.getElementById("darknet-icon").onclick = ()=> openWin(darknetWin);
+
+makeDraggable(notesWin);
+makeDraggable(darknetWin);
+
+// ===== TERMINAL =====
+const out = document.getElementById("terminal-output");
+const inp = document.getElementById("terminal-input");
+const btn = document.getElementById("terminal-run");
+
+let stage = 0;
+
+function log(text) {
+    out.innerHTML += text + "<br>";
+    out.scrollTop = out.scrollHeight;
+}
+
+const responses = {
+    "VAGOS": "Gang Vagos Detectado..",
+    "AZTECAS": "Gang Aztecas Detectado..",
+    "SERRANA-DE-HUANTA": "Organisation Serrana de Huanta Detectado..",
+    "LOCO-SYNDICATE": "Organisation Loco Syndicate Detectado.."
+};
+
+function loading(callback) {
+    log("Cargando....");
+    setTimeout(callback, 1000);
+}
+
+function runCommand() {
+    const cmd = inp.value.trim();
+    inp.value = "";
+
+    if (!cmd) return;
+
+    log("> " + cmd);
+
+    const parts = cmd.split(" ");
+    const c = parts[0].toLowerCase();
+
+    if (c === "access") {
+        const code = (parts[1] || "").toUpperCase();
+        if (!responses[code]) return log("Código inválido.");
+        loading(()=>{
+            log("<span style='color:#7ef'>"+responses[code]+"</span>");
+            stage = 1;
+        });
+        return;
+    }
+
+    if (c === "confirm") {
+        if (stage !== 1) return log("Ninguna secuencia activa..");
+        loading(()=>{
+            log("<span style='color:#7ef'>Secuencia activa.</span>");
+            stage = 2;
+        });
+        return;
+    }
+
+    if (c === "finalize") {
+        if (stage !== 2) return log("Debe escribir confirm primero..");
+        loading(()=>{
+            log("<span style='color:#0f0'>Proceso finalizado. Por favor, envíen su código de grupo a este número: 555‑74523.Se les enviará información adicional a través de esta línea segura. </span>");
+            stage = 0;
+        });
+        return;
+        
+    }
+
+    log("Commande inconnue.");
+}
+
+btn.onclick = runCommand;
+inp.onkeydown = e => { if (e.key === "Enter") runCommand(); };
+
+</script>
+
+</body>
+</html>

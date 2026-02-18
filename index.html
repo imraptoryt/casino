@@ -1,257 +1,243 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<title>Desktop Acceso seguro.</title>
-<style>
-    body {
-        margin:0;
-        background:#1e1e1e;
-        font-family:Arial;
-        user-select:none;
-        overflow:hidden;
-    }
-    #desktop {
-        width:100vw;
-        height:100vh;
-        position:relative;
-    }
-    .icon {
-        width:70px;
-        text-align:center;
-        color:white;
-        cursor:pointer;
-        margin:20px;
-    }
-    .window {
-        width:420px;
-        height:300px;
-        background:#2b2b2b;
-        color:white;
-        border:1px solid #555;
-        border-radius:6px;
-        position:absolute;
-        display:none;
-        flex-direction:column;
-        top:100px;
-        left:100px;
-        opacity:0;
-        transition:0.25s;
-    }
-    .titlebar {
-        background:#444;
-        padding:5px;
-        cursor:move;
-        display:flex;
-        justify-content:space-between;
-        align-items:center;
-    }
-    .closeBtn {
-        width:18px; height:18px;
-        background:#ff5c5c;
-        border-radius:50%;
-        cursor:pointer;
-    }
-    #notes-content, #darknet-content {
-        padding:10px;
-        flex:1;
-        overflow:auto;
-        font-size:14px;
-    }
-    #terminal-output {
-        height:150px;
-        overflow:auto;
-        background:#111;
-        color:#0f0;
-        padding:5px;
-        font-family:monospace;
-        margin-bottom:5px;
-    }
-    #terminal-input {
-        width:75%;
-        padding:5px;
-        background:#222;
-        border:1px solid #555;
-        color:white;
-    }
-    button {
-        padding:5px 10px;
-    }
-</style>
+    <meta charset="UTF-8">
+    <title>Diamond OS - Corporate Management</title>
+    <style>
+        :root {
+            --gold: #c1a35f; --gold-bright: #f1d592; --bg-dark: #050505;
+            --win-bg: rgba(12, 12, 12, 0.98); --text: #e0e0e0; --error: #ff4d4d; --terminal: #00ff41;
+        }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', sans-serif; background: url('https://i.imgur.com/8Nf9Y6X.jpg') center/cover no-repeat; overflow: hidden; color: var(--text); }
+        
+        /* --- BUREAU --- */
+        #desktop { width: 100%; height: calc(100% - 45px); position: relative; padding: 20px; display: grid; grid-template-columns: repeat(auto-fill, 110px); grid-template-rows: repeat(auto-fill, 120px); grid-auto-flow: column; gap: 15px; background: rgba(0,0,0,0.5); }
+        .icon { width: 100px; padding: 10px; text-align: center; cursor: pointer; border-radius: 4px; transition: 0.2s; }
+        .icon:hover { background: rgba(193, 163, 95, 0.2); border: 1px solid var(--gold); }
+        .icon img { width: 45px; height: 45px; filter: drop-shadow(0 4px 5px black); }
+        .icon span { font-size: 11px; display: block; margin-top: 8px; text-shadow: 1px 1px 3px black; font-weight: bold; }
+
+        /* --- FENÊTRES --- */
+        .window { position: absolute; width: 850px; height: 600px; background: var(--win-bg); border: 1px solid var(--gold); box-shadow: 0 0 50px rgba(0,0,0,1); display: none; flex-direction: column; border-radius: 4px; overflow: hidden; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10; }
+        .win-header { background: linear-gradient(to right, #1a1a1a, #000); padding: 12px 15px; display: flex; justify-content: space-between; align-items: center; cursor: move; border-bottom: 1px solid var(--gold); user-select: none; }
+        .win-content { padding: 0; flex: 1; display: flex; overflow: hidden; }
+        .btn-close { color: var(--gold); cursor: pointer; font-size: 20px; font-weight: bold; }
+
+        /* --- INTERFACE MAIL --- */
+        #mail-sidebar { width: 300px; border-right: 1px solid #333; overflow-y: auto; background: rgba(20,20,20,0.5); }
+        #mail-view { flex: 1; padding: 30px; overflow-y: auto; background: #0a0a0a; position: relative; }
+        .mail-item { padding: 15px; border-bottom: 1px solid #222; cursor: pointer; transition: 0.2s; position: relative; }
+        .mail-item:hover { background: #1a1a1a; }
+        .mail-item.active { background: rgba(193, 163, 95, 0.15); border-left: 3px solid var(--gold); }
+        .mail-sender { color: var(--gold); font-weight: bold; font-size: 13px; margin-bottom: 4px; }
+        .mail-subject { font-size: 12px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mail-date { font-size: 10px; color: #666; position: absolute; top: 15px; right: 15px; }
+
+        .mail-full-header { border-bottom: 1px solid #333; margin-bottom: 20px; padding-bottom: 15px; }
+        .mail-full-subject { font-size: 22px; color: var(--gold); margin-bottom: 10px; }
+        .mail-full-info { font-size: 13px; color: #888; }
+        .mail-full-body { line-height: 1.6; font-size: 14px; color: #ccc; white-space: pre-wrap; }
+
+        /* --- AUTRES APPS --- */
+        .room-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; padding: 20px; }
+        .room { border: 1px solid #222; padding: 12px; text-align: center; font-size: 11px; background: #0a0a0a; border-radius: 4px; cursor: not-allowed; }
+        .occupied { border-top: 3px solid var(--error); }
+        .free { border-top: 3px solid var(--terminal); color: var(--terminal); }
+        .note-paper { background: #fdf6e3; color: #333; padding: 30px; height: 100%; font-family: 'Courier New', monospace; box-sizing: border-box;}
+
+        /* --- UI ELEMENTS --- */
+        #notif-box { position: absolute; bottom: 60px; right: 20px; display: flex; flex-direction: column; gap: 10px; z-index: 9999; }
+        .notif { background: rgba(10,10,10,0.95); border-left: 4px solid var(--gold); padding: 15px; width: 280px; animation: slideIn 0.4s ease-out; }
+        @keyframes slideIn { from { transform: translateX(120%); } to { transform: translateX(0); } }
+        #taskbar { position: absolute; bottom: 0; width: 100%; height: 45px; background: #000; display: flex; align-items: center; justify-content: space-between; padding: 0 15px; border-top: 1px solid #222; z-index: 1000; box-sizing: border-box; }
+    </style>
 </head>
 <body>
 
 <div id="desktop">
-
-    <!-- Icons -->
-    <div id="notes-icon" class="icon">
-        <img src="https://i.goopics.net/ag93r0.png" style="width:50px;height:50px;background:#77777700;">
-        <div>Notes</div>
-    </div>
-
-    <div id="darknet-icon" class="icon">
-        <img src="https://i.goopics.net/ddh5cp.png" style="width:50px;height:50px;background:#55555500;">
-        <div>Darknet</div>
-    </div>
-
-    <!-- NOTES WINDOW -->
-    <div id="notes-window" class="window">
-        <div class="titlebar">
-            Notes
-            <div class="closeBtn" onclick="closeWin(notesWin)"></div>
-        </div>
-        <div id="notes-content">
-            <b>Cartel Madrazo</b><br><br>
-            El Cartel Madrazo desea reunirse con ustedes. Para garantizar la confidencialidad y evitar cualquier tipo de vigilancia, el primer punto de contacto se realizará únicamente a través de esta mensajería segura.<br>
-
-Cada grupo involucrado debe confirmar su disponibilidad utilizando su código interno, correspondiente a su nombre en mayúsculas.<br>
-Si el nombre de su grupo contiene espacios, sustitúyanlos por guiones.<br>
-<br>
-El objetivo de este primer contacto es coordinar los intercambios iniciales y preparar las bases para una colaboración más estrecha. No se autoriza ningún contacto directo antes de la confirmación por esta mensajería.<br>
-<br>
-Comandos disponibles en el terminal:<br>
-access [CODE]<br>
-confirm<br>
-finalize<br>
-<br>
-Grupos implicados:<br>
-VAGOS<br>
-AZTECAS<br>
-SERRANA-DE-HUANTA<br>
-MONZORAS<br>
-CUBAIN<br>
-        </div>
-    </div>
-
-    <!-- DARKNET WINDOW -->
-    <div id="darknet-window" class="window">
-        <div class="titlebar">
-            Darknet Terminal
-            <div class="closeBtn" onclick="closeWin(darknetWin)"></div>
-        </div>
-
-        <div id="darknet-content">
-            <div id="terminal-output"></div>
-            <input id="terminal-input" type="text">
-            <button id="terminal-run">Run</button>
-        </div>
-    </div>
-
+    <div class="icon" onclick="openApp('win-browser')"><img src="https://cdn-icons-png.flaticon.com/512/300/300221.png"><span>Internet</span></div>
+    <div class="icon" onclick="openApp('win-terminal')"><img src="https://cdn-icons-png.flaticon.com/512/2910/2910795.png"><span>Gestionnaire</span></div>
+    <div class="icon" onclick="openApp('win-mail')"><img src="https://cdn-icons-png.flaticon.com/512/281/281769.png"><span>Emails</span></div>
+    <div class="icon" onclick="openApp('win-bawsaq')"><img src="https://cdn-icons-png.flaticon.com/512/2422/2422796.png"><span>BAWSAQ</span></div>
+    <div class="icon" onclick="openApp('win-notes')"><img src="https://cdn-icons-png.flaticon.com/512/3209/3209265.png"><span>Notes VIP</span></div>
+    <div class="icon" onclick="denied('Corbeille')"><img src="https://cdn-icons-png.flaticon.com/512/2891/2891491.png"><span>Corbeille</span></div>
 </div>
 
+<div id="win-mail" class="window">
+    <div class="win-header"><span>📧 Diamond Secure Mail - Inbox</span> <span class="btn-close" onclick="closeApp('win-mail')">×</span></div>
+    <div class="win-content">
+        <div id="mail-sidebar"></div>
+        <div id="mail-view">
+            <div style="text-align:center; color:#555; margin-top:100px;">Sélectionnez un message pour le lire</div>
+        </div>
+    </div>
+</div>
+
+<div id="win-bawsaq" class="window" style="width:500px; height:400px;">
+    <div class="win-header"><span>📈 BAWSAQ Index</span> <span class="btn-close" onclick="closeApp('win-bawsaq')">×</span></div>
+    <div class="win-content" style="padding:20px; display:block;">
+        <h3 style="color:var(--gold)">Marché de Los Santos</h3>
+        <div class="stock-item" style="padding:10px; border-bottom:1px solid #222; display:flex; justify-content:space-between;"><span>Diamond Casino (DIA)</span> <span style="color:#00ff41">+14.2% ▲</span></div>
+        <div class="stock-item" style="padding:10px; border-bottom:1px solid #222; display:flex; justify-content:space-between;"><span>LifeInvader (LFI)</span> <span style="color:red">-3.1% ▼</span></div>
+        <div class="stock-item" style="padding:10px; border-bottom:1px solid #222; display:flex; justify-content:space-between;"><span>Maze Bank (MAZ)</span> <span style="color:#00ff41">+0.5% ▲</span></div>
+    </div>
+</div>
+
+<div id="win-notes" class="window" style="width:450px; height:500px;">
+    <div class="win-header"><span>📝 Bloc-notes VIP</span> <span class="btn-close" onclick="closeApp('win-notes')">×</span></div>
+    <div class="win-content" style="display:block;"><div class="note-paper"><h3>📌 VIP ETAGE 5</h3><ul id="vip-list"></ul><br><p style="color:red"><b>CODE TERMINAL: DIAMOND2024</b></p></div></div>
+</div>
+
+<div id="win-terminal" class="window" style="width:500px; height:300px;">
+    <div class="win-header"><span>>_ Authentification</span> <span class="btn-close" onclick="closeApp('win-terminal')">×</span></div>
+    <div class="win-content" style="background:#000; color:var(--terminal); font-family:monospace; padding:20px; display:block;">
+        Diamond OS Secure Login...<br>PASSWORD: <input type="password" id="term-input" onkeydown="handleLogin(event)" style="background:transparent; border:none; color:var(--terminal); outline:none;" autofocus>
+    </div>
+</div>
+
+<div id="win-registry" class="window" style="width:850px; height:600px;">
+    <div class="win-header"><span>📋 Registre des Suites</span> <span class="btn-close" onclick="closeApp('win-registry')">×</span></div>
+    <div class="win-content" style="display:block;">
+        <div class="floor-tabs" id="tab-list" style="padding:20px 20px 0 20px;"></div>
+        <div id="room-grid" class="room-grid"></div>
+    </div>
+</div>
+
+<div id="win-browser" class="window">
+    <div class="win-header"><span>🌐 Diamond Browser</span> <span class="btn-close" onclick="closeApp('win-browser')">×</span></div>
+    <div class="win-content" style="display:block; padding:20px;"><h3 style="color:var(--gold)">Historique étendu</h3><div id="browser-content"></div></div>
+</div>
+
+<div id="notif-box"></div>
+<div id="taskbar"><div><img src="https://i.imgur.com/B94zH57.png" height="25" style="vertical-align:middle;"> Diamond OS</div><span id="clock"></span></div>
+
 <script>
-// ===== DRAGGABLE =====
-function makeDraggable(element) {
-    const bar = element.querySelector(".titlebar");
-    let offsetX=0, offsetY=0, dragging=false;
+    const names = ["Julian", "Marc", "Sophie", "Elena", "Lucas", "Yuki", "Victor", "Chloe", "Sarah", "Antoine", "Dimitri", "Akira", "Marius", "Isabella", "Pablo", "Sasha", "Hugo", "Manon", "Lia", "Théo"];
+    const surnames = ["Moretti", "Vance", "Rossi", "Muller", "Tanaka", "Gomez", "Dupont", "Smith", "Fisher", "Ivanov", "Zhang"];
+    let rooms = {};
+    let vips = [];
 
-    bar.addEventListener("mousedown", e=>{
-        dragging=true;
-        offsetX = e.clientX - element.offsetLeft;
-        offsetY = e.clientY - element.offsetTop;
+    const mailData = [
+        {
+            id: 1,
+            sender: "Agatha Baker",
+            subject: "Audit de sécurité et protocoles des suites",
+            date: "14:22",
+            body: "Cher Administrateur,\n\nSuite aux récents incidents dans l'aile sud, la direction demande un audit complet des accès au 5ème étage. Nous avons remarqué que certains membres du personnel partagent encore le code du terminal par messagerie non sécurisée. \n\nPour rappel, le code de session actuel est DIAMOND2024. Il doit être mémorisé et tout document physique le contenant doit être détruit immédiatement.\n\nCordialement,\nAgatha Baker\nDirectrice de Gestion, Diamond Casino & Resort."
+        },
+        {
+            id: 2,
+            sender: "Conciergerie VIP",
+            subject: "Demande spéciale : Suite de " + names[0],
+            date: "11:05",
+            body: "Le client VIP occupant la suite du 5ème étage a demandé que le mini-bar soit entièrement rempli de Champagne Blâneur et de caviar russe avant 18h.\n\nIl a également mentionné que le Wi-Fi dans la suite présentait des latences inacceptables pour ses transactions boursières. Veuillez vérifier le routeur de l'étage.\n\nNe le faites pas attendre, vous connaissez son tempérament."
+        },
+        {
+            id: 3,
+            sender: "Service Maintenance",
+            subject: "Ventilation de la salle des coffres",
+            date: "08:15",
+            body: "L'équipe de maintenance interviendra demain à 04h00 pour le remplacement des filtres à air du niveau B1.\n\nL'accès sera restreint pendant 2 heures. Veuillez informer les gardes de la chambre forte qu'il n'est pas nécessaire de déclencher l'alarme silencieuse lors de l'ouverture des conduits secondaires.\n\nTechnicien #42."
+        },
+        {
+            id: 4,
+            sender: "Lester C.",
+            subject: "Une petite faille...",
+            date: "Hier",
+            body: "Salut,\n\nJuste pour info, votre système de gestion des suites est une vraie passoire. Si j'étais vous, je ferais attention à qui regarde l'historique du navigateur. Un gamin de 12 ans pourrait trouver vos codes secrets en deux clics.\n\nAmusez-vous bien avec vos millionnaires.\n\n- L"
+        },
+        {
+            id: 5,
+            sender: "Département Juridique",
+            subject: "Incident à la table de Blackjack VIP",
+            date: "Hier",
+            body: "Nous avons reçu une mise en demeure suite à l'expulsion de force d'un client hier soir. \n\nVeuillez extraire les enregistrements des caméras 12 et 14 et les envoyer à mon bureau. Assurez-vous que le nom du client n'apparaisse pas dans le registre public avant que nous ayons réglé l'affaire à l'amiable."
+        }
+    ];
+
+    function init() {
+        for(let f=1; f<=5; f++){
+            for(let r=0; r<=20; r++){
+                let id = f*100+r;
+                let isOcc = Math.random() > 0.3;
+                rooms[id] = { name: isOcc ? names[Math.floor(Math.random()*names.length)] + " " + surnames[Math.floor(Math.random()*surnames.length)] : "LIBRE" };
+                if(f === 5 && isOcc && vips.length < 5) vips.push({name: rooms[id].name, room: id});
+            }
+        }
+        const vList = document.getElementById('vip-list');
+        vips.forEach(v => vList.innerHTML += `<li>👑 ${v.name} (#${v.room})</li>`);
+
+        const side = document.getElementById('mail-sidebar');
+        mailData.forEach(m => {
+            side.innerHTML += `
+                <div class="mail-item" id="mail-${m.id}" onclick="readMail(${m.id})">
+                    <span class="mail-date">${m.date}</span>
+                    <div class="mail-sender">${m.sender}</div>
+                    <div class="mail-subject">${m.subject}</div>
+                </div>`;
+        });
+
+        const hist = document.getElementById('browser-content');
+        for(let i=0; i<30; i++) hist.innerHTML += `<div style="padding:8px; border-bottom:1px solid #222; color:#777; font-size:12px;">🔍 eyefind.info/search?q=${['vault+security','diamond+resort+codes','bawsaq+tips'][Math.floor(Math.random()*3)]}</div>`;
+    }
+
+    function readMail(id) {
+        document.querySelectorAll('.mail-item').forEach(i => i.classList.remove('active'));
+        document.getElementById('mail-'+id).classList.add('active');
+        const mail = mailData.find(m => m.id === id);
+        const view = document.getElementById('mail-view');
+        view.innerHTML = `
+            <div class="mail-full-header">
+                <div class="mail-full-subject">${mail.subject}</div>
+                <div class="mail-full-info">De : <b>${mail.sender}</b> | Reçu le : ${mail.date}</div>
+            </div>
+            <div class="mail-full-body">${mail.body}</div>
+        `;
+    }
+
+    function openApp(id) {
+        const w = document.getElementById(id); w.style.display = 'flex'; w.style.zIndex = Math.floor(Date.now()/1000);
+        if(id === 'win-terminal') document.getElementById('term-input').focus();
+        if(id === 'win-registry') renderF(1);
+    }
+
+    function closeApp(id) { document.getElementById(id).style.display = 'none'; }
+
+    function handleLogin(e) {
+        if(e.key === 'Enter') {
+            if(document.getElementById('term-input').value.toUpperCase() === "DIAMOND2024") { closeApp('win-terminal'); openApp('win-registry'); }
+            else { denied('Terminal'); document.getElementById('term-input').value = ""; }
+        }
+    }
+
+    function renderF(f) {
+        const tabs = document.getElementById('tab-list'); tabs.innerHTML = '';
+        for(let i=1; i<=5; i++) tabs.innerHTML += `<button class="floor-btn ${i===f?'active':''}" onclick="renderF(${i})" style="background:#111; border:1px solid var(--gold); color:var(--gold); padding:8px; margin-right:5px; cursor:pointer;">ETAGE ${i}</button>`;
+        const grid = document.getElementById('room-grid'); grid.innerHTML = '';
+        for(let r=0; r<=20; r++){
+            let id = f*100+r;
+            grid.innerHTML += `<div class="room ${rooms[id].name==='LIBRE'?'free':'occupied'}" onclick="denied('Lecture Seule')"><b>#${id}</b><br>${rooms[id].name}</div>`;
+        }
+    }
+
+    function denied(app) {
+        const n = document.createElement('div'); n.className = 'notif';
+        n.innerHTML = `<b style="color:var(--gold)">SYSTÈME</b><br>Accès à <b>${app}</b> restreint.`;
+        document.getElementById('notif-box').appendChild(n);
+        setTimeout(() => n.remove(), 3000);
+    }
+
+    document.querySelectorAll('.win-header').forEach(h => {
+        h.onmousedown = (e) => {
+            let w = h.parentElement; w.style.transform = "none"; w.style.zIndex = 9000;
+            let sx = e.clientX - w.offsetLeft; let sy = e.clientY - w.offsetTop;
+            document.onmousemove = (m) => { w.style.left = (m.clientX - sx) + 'px'; w.style.top = (m.clientY - sy) + 'px'; };
+            document.onmouseup = () => { document.onmousemove = null; };
+        };
     });
 
-    document.addEventListener("mousemove", e=>{
-        if(!dragging) return;
-        element.style.left = (e.clientX - offsetX) + "px";
-        element.style.top = (e.clientY - offsetY) + "px";
-    });
-    document.addEventListener("mouseup", ()=> dragging=false);
-}
-
-// ===== WINDOWS =====
-const notesWin = document.getElementById("notes-window");
-const darknetWin = document.getElementById("darknet-window");
-
-function openWin(win) {
-    win.style.display = "flex";
-    setTimeout(()=> win.style.opacity = "1", 5);
-}
-function closeWin(win) {
-    win.style.opacity = "0";
-    setTimeout(()=> win.style.display = "none", 200);
-}
-
-// Icons open windows
-document.getElementById("notes-icon").onclick = ()=> openWin(notesWin);
-document.getElementById("darknet-icon").onclick = ()=> openWin(darknetWin);
-
-makeDraggable(notesWin);
-makeDraggable(darknetWin);
-
-// ===== TERMINAL =====
-const out = document.getElementById("terminal-output");
-const inp = document.getElementById("terminal-input");
-const btn = document.getElementById("terminal-run");
-
-let stage = 0;
-
-function log(text) {
-    out.innerHTML += text + "<br>";
-    out.scrollTop = out.scrollHeight;
-}
-
-const responses = {
-    "VAGOS": "Gang Vagos validado.",
-    "AZTECAS": "Aztecas detectado.",
-    "SERRANA-DE-HUANTA": "Serrana de Huanta recibido.",
-    "LOCO-SYNDICATE": "Loco Syndicate aceptado.",
-    "MONZORAS": "Famillie Monzoras validada.",
-    "CUBAIN": "Milicia Unidad Cubana detectada."
-};
-
-function loading(callback) {
-    log("Cargando....");
-    setTimeout(callback, 1000);
-}
-
-function runCommand() {
-    const cmd = inp.value.trim();
-    inp.value = "";
-
-    if (!cmd) return;
-
-    log("> " + cmd);
-
-    const parts = cmd.split(" ");
-    const c = parts[0].toLowerCase();
-
-    if (c === "access") {
-        const code = (parts[1] || "").toUpperCase();
-        if (!responses[code]) return log("Código inválido.");
-        loading(()=>{
-            log("<span style='color:#7ef'>"+responses[code]+"</span>");
-            stage = 1;
-        });
-        return;
-    }
-
-    if (c === "confirm") {
-        if (stage !== 1) return log("Ninguna secuencia activa..");
-        loading(()=>{
-            log("<span style='color:#7ef'>Secuencia activa.</span>");
-            stage = 2;
-        });
-        return;
-    }
-
-    if (c === "finalize") {
-        if (stage !== 2) return log("Debe escribir confirm primero..");
-        loading(()=>{
-            log("<span style='color:#0f0'>Proceso finalizado. Por favor, envíen su código de grupo a este número: 555‑74523.Se les enviará información adicional a través de esta línea segura. </span>");
-            stage = 0;
-        });
-        return;
-        
-    }
-
-    log("Commande inconnue.");
-}
-
-btn.onclick = runCommand;
-inp.onkeydown = e => { if (e.key === "Enter") runCommand(); };
-
+    init();
+    setInterval(() => { let d = new Date(); document.getElementById('clock').innerText = d.getHours() + ":" + String(d.getMinutes()).padStart(2, '0'); }, 1000);
 </script>
-
 </body>
 </html>

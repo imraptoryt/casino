@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Map Planner</title>
+<style>
+    :root {
+        --gold: #c1a35f;
+        --gold-bright: #f1d592;
+        --bg-dark: #0a0a0a;
+        --panel: rgba(15, 15, 15, 0.95);
+        --text: #e0e0e0;
+        --accent: #4da6ff;
+    }
+    * { box-sizing: border-box; }
+    body, html {
+        margin: 0; padding: 0; height: 100%; width: 100%;
+        font-family: 'Segoe UI', sans-serif;
+        background: var(--bg-dark); color: var(--text);
+        overflow: hidden; user-select: none;
+    }
+    #app { width: 100vw; height: 100vh; position: relative; }
+
+    /* --- MAP CANVAS AREA --- */
+    #canvasWrap {
+        position: absolute; inset: 0;
+        overflow: hidden;
+        cursor: crosshair;
+        background: #000;
+    }
+    #mapImg, #drawCanvas {
+        position: absolute; top: 0; left: 0;
+        transform-origin: 0 0;
+        pointer-events: none;
+    }
+    #mapImg { user-select: none; -webkit-user-drag: none; }
+
+    /* --- TOOLBAR --- */
+    #toolbar {
+        position: absolute; top: 12px; left: 12px;
+        background: var(--panel);
+        border: 1px solid var(--gold);
+        border-radius: 6px;
+        padding: 10px;
+        display: flex; flex-direction: column; gap: 6px;
+        z-index: 100;
+        box-shadow: 0 6px 24px rgba(0,0,0,0.7);
+        max-height: calc(100vh - 24px);
+        overflow-y: auto;
+    }
+    #toolbar h3 {
+        margin: 0 0 4px 0; color: var(--gold);
+        font-size: 13px; letter-spacing: 1px;
+        border-bottom: 1px solid #333; padding-bottom: 4px;
+    }
+    .tool-row { display: flex; gap: 4px; flex-wrap: wrap; }
+    .tool-btn {
+        background: #1a1a1a; color: var(--text);
+        border: 1px solid #333; padding: 7px 10px;
+        cursor: pointer; border-radius: 4px;
+        font-size: 12px; min-width: 38px;
+        transition: 0.15s;
+    }
+    .tool-btn:hover { background: #2a2a2a; border-color: var(--gold); }
+    .tool-btn.active {
+        background: var(--gold); color: #000; border-color: var(--gold-bright);
+        font-weight: bold;
+    }
+    .tool-btn.danger { border-color: #663333; color: #ff8888; }
+    .tool-btn.danger:hover { background: #331111; }
+
+    .label { font-size: 11px; color: #888; margin-top: 4px; }
+    input[type="color"] {
+        width: 40px; height: 28px; border: 1px solid #333;
+        background: #1a1a1a; cursor: pointer; border-radius: 4px;
+    }
+    input[type="range"] { width: 110px; }
+    select {
+        background: #1a1a1a; color: var(--text); border: 1px solid #333;
+        padding: 5px; border-radius: 4px; font-size: 12px;
+    }
+
+    /* --- STATUS BAR --- */
+    #status {
+        position: absolute; bottom: 12px; left: 12px;
+        background: var(--panel);
+        border: 1px solid #333;
+        border-radius: 4px;
+        padding: 6px 12px;
+        font-size: 12px; color: #aaa;
+        z-index: 100;
+        font-family: 'Consolas', monospace;
+    }
+    #status .key { color: var(--gold); }
+
+    /* --- EMOJI PICKER --- */
+    #emojiPanel {
+        position: absolute; top: 12px; right: 12px;
+        background: var(--panel);
+        border: 1px solid var(--gold);
+        border-radius: 6px;
+        padding: 10px;
+        display: none;
+        flex-direction: column; gap: 6px;
+        z-index: 100;
+        width: 260px;
+        max-height: 400px;
+        overflow-y: auto;
+        box-shadow: 0 6px 24px rgba(0,0,0,0.7);
+    }
+    #emojiPanel.visible { display: flex; }
+    .emoji-grid {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 3px;
+    }
+    .emoji-btn {
+        background: #1a1a1a; border: 1px solid #2a2a2a;
+        font-size: 18px; padding: 4px; cursor: pointer;
+        border-radius: 3px; transition: 0.1s;
+    }
+    .emoji-btn:hover { background: var(--gold); transform: scale(1.15); }
+    .emoji-search {
+        background: #1a1a1a; border: 1px solid #333;
+        color: var(--text); padding: 6px; border-radius: 4px;
+        font-size: 12px; width: 100%;
+    }
+
+    /* --- ZOOM CONTROLS --- */
+    #zoomCtrl {
+        position: absolute; bottom: 12px; right: 12px;
+        background: var(--panel);
+        border: 1px solid #333;
+        border-radius: 4px;
+        padding: 6px;
+        display: flex; gap: 4px;
+        z-index: 100;
+    }
+
+    #panOverlay {
+        position: absolute; inset: 0;
+        display: none;
+        background: rgba(193,163,95,0.05);
+        pointer-events: none;
+        z-index: 50;
+        text-align: center;
+        color: var(--gold);
+        font-size: 14px;
+        padding-top: 20px;
+    }
+    #panOverlay.active { display: block; }
+
+    .divider { height: 1px; background: #333; margin: 4px 0; }
+</style>
+</head>
+<body>
+<div id="app">
+    <div id="canvasWrap">
+        <img id="mapImg" alt="map" draggable="false">
+        <canvas id="drawCanvas"></canvas>
+    </div>
+    <div id="panOverlay">[ SPACE held — drag to pan ]</div>
+
+    <div id="toolbar">
+        <h3>MAP</h3>
+        <div class="tool-row">
+            <button class="tool-btn active" data-map="satellite">Satellite</button>
+            <button class="tool-btn" data-map="atlas">Atlas</button>
+        </div>
+
+        <h3>TOOLS</h3>
+        <div class="tool-row">
+            <button class="tool-btn active" data-tool="select" title="Select / Move">↖</button>
+            <button class="tool-btn" data-tool="point" title="Point">●</button>
+            <button class="tool-btn" data-tool="line" title="Line (click 2 points)">╱</button>
+            <button class="tool-btn" data-tool="freedraw" title="Free Draw">✎</button>
+            <button class="tool-btn" data-tool="rect" title="Rectangle">▭</button>
+            <button class="tool-btn" data-tool="square" title="Square">◻</button>
+            <button class="tool-btn" data-tool="circle" title="Circle">○</button>
+            <button class="tool-btn" data-tool="chain" title="Chain — place points, dbl-click to finish">⛓</button>
+            <button class="tool-btn" data-tool="emoji" title="Emoji">😀</button>
+            <button class="tool-btn" data-tool="text" title="Text">T</button>
+            <button class="tool-btn" data-tool="erase" title="Click to delete shape">✖</button>
+        </div>
+
+        <div class="label">Color</div>
+        <div class="tool-row" style="align-items:center;">
+            <input type="color" id="colorPick" value="#ff3b3b">
+            <input type="color" id="fillPick" value="#ffaa00" title="Fill color">
+            <label style="font-size:11px;display:flex;align-items:center;gap:4px;color:#aaa;">
+                <input type="checkbox" id="fillToggle"> Fill
+            </label>
+        </div>
+
+        <div class="label">Stroke width: <span id="widthVal">3</span>px</div>
+        <input type="range" id="widthRange" min="1" max="20" value="3">
+
+        <div class="label">Emoji size: <span id="emojiVal">28</span>px</div>
+        <input type="range" id="emojiRange" min="14" max="80" value="28">
+
+        <div class="divider"></div>
+        <h3>ACTIONS</h3>
+        <div class="tool-row">
+            <button class="tool-btn" id="undoBtn" title="Undo (Ctrl+Z)">↶ Undo</button>
+            <button class="tool-btn" id="exportPng">Export PNG</button>
+        </div>
+        <div class="tool-row">
+            <button class="tool-btn" id="exportJson">Export JSON</button>
+            <button class="tool-btn" id="importJson">Import JSON</button>
+        </div>
+        <input type="file" id="importFile" accept="application/json" style="display:none;">
+        <button class="tool-btn danger" id="resetBtn">⚠ Reset All</button>
+    </div>
+
+    <div id="emojiPanel">
+        <input type="text" class="emoji-search" id="emojiSearch" placeholder="Search... or pick below">
+        <div class="emoji-grid" id="emojiGrid"></div>
+    </div>
+
+    <div id="zoomCtrl">
+        <button class="tool-btn" id="zoomOut">−</button>
+        <button class="tool-btn" id="zoomReset">100%</button>
+        <button class="tool-btn" id="zoomIn">+</button>
+    </div>
+
+    <div id="status">
+        <span class="key">SPACE</span> pan ·
+        <span class="key">WHEEL</span> zoom ·
+        <span class="key">CTRL+Z</span> undo ·
+        <span class="key">DBL-CLICK</span> finish chain ·
+        <span id="coords">0, 0</span> ·
+        <span id="zoomLabel">100%</span>
+    </div>
+</div>
+
+<script>
+// =========================================================
+// MAP PLANNER
+// =========================================================
+const MAP_URLS = {
+    satellite: 'https://imgg.fr/r/L28LvmQj.jpg',
+    atlas:     'https://imgg.fr/r/Q49xK2tB.jpg'
+};
+const STORAGE_KEY = 'mapPlannerData_v1';
+
+const EMOJIS = [
+    '📍','📌','🚩','🏁','⭐','❤️','⚠️','❗','❓','✅','❌','🔥','💀','☠️',
+    '🏠','🏡','🏢','🏰','⛪','🕌','🏯','🗼','🏭','🏬','🏥','🏦','🏨','🏪',
+    '🌲','🌳','🌴','🌵','🌾','🌿','☘️','🍀','🌷','🌹','🌻','🌺','🌼','🍄',
+    '⛰️','🏔️','🌋','🏕️','🏖️','🏜️','🏝️','🏞️','🛣️','🛤️','🌉','⛩️',
+    '⚓','⛵','🚤','🛥️','🛳️','⛴️','🚢','✈️','🚁','🚀','🛸','🛩️',
+    '🚗','🚕','🚙','🚌','🚓','🚑','🚒','🚚','🚛','🏍️','🛵','🚲',
+    '⚔️','🛡️','🏹','🔫','💣','🧨','💰','💎','🔑','🗝️','⚙️','🔧',
+    '👑','🎯','🎖️','🏆','🥇','🎁','📦','💼','🎪','🎭','🎨','🎲',
+    '🌟','✨','💫','🌙','☀️','⛅','☁️','🌧️','⛈️','🌩️','❄️','☂️',
+    '🐎','🐺','🦅','🦉','🐍','🐉','🦁','🐯','🐻','🐗','🦊','🦌',
+    '👤','👥','👮','🕵️','🧙','🧝','🧛','🧟','👹','👺','👻','😈'
+];
+
+// World coordinates (image-space): everything stored in these
+let state = {
+    mapType: 'satellite',
+    shapes: [],
+    history: []   // snapshots of shapes for undo
+};
+
+let tool = 'select';
+let stroke = '#ff3b3b';
+let fill = '#ffaa00';
+let useFill = false;
+let strokeWidth = 3;
+let emojiSize = 28;
+let selectedEmoji = '📍';
+
+let view = { x: 0, y: 0, scale: 1 };  // translate then scale
+let mapNaturalW = 0, mapNaturalH = 0;
+
+let isPanning = false, spaceDown = false;
+let panStart = null;
+let drawing = null;          // in-progress shape
+let freePoints = [];         // for freedraw
+let chainPoints = [];        // for chain tool
+let linePointFirst = null;   // for line tool
+
+const wrap = document.getElementById('canvasWrap');
+const mapImg = document.getElementById('mapImg');
+const canvas = document.getElementById('drawCanvas');
+const ctx = canvas.getContext('2d');
+
+// ----- LOAD / SAVE -----
+function save() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ mapType: state.mapType, shapes: state.shapes })); }
+    catch(e) { console.warn('save failed', e); }
+}
+function load() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const d = JSON.parse(raw);
+        if (d.mapType) state.mapType = d.mapType;
+        if (Array.isArray(d.shapes)) state.shapes = d.shapes;
+    } catch(e) { console.warn('load failed', e); }
+}
+function pushHistory() {
+    state.history.push(JSON.stringify(state.shapes));
+    if (state.history.length > 50) state.history.shift();
+}
+function undo() {
+    if (!state.history.length) return;
+    state.shapes = JSON.parse(state.history.pop());
+    render(); save();
+}
+
+// ----- MAP -----
+function setMap(type) {
+    state.mapType = type;
+    document.querySelectorAll('[data-map]').forEach(b =>
+        b.classList.toggle('active', b.dataset.map === type));
+    mapImg.src = MAP_URLS[type];
+    save();
+}
+mapImg.addEventListener('load', () => {
+    mapNaturalW = mapImg.naturalWidth;
+    mapNaturalH = mapImg.naturalHeight;
+    mapImg.style.width = mapNaturalW + 'px';
+    mapImg.style.height = mapNaturalH + 'px';
+    canvas.width = mapNaturalW;
+    canvas.height = mapNaturalH;
+    canvas.style.width = mapNaturalW + 'px';
+    canvas.style.height = mapNaturalH + 'px';
+    fitView();
+    render();
+});
+
+// ----- VIEW (pan + zoom) -----
+function applyTransform() {
+    const t = `translate(${view.x}px, ${view.y}px) scale(${view.scale})`;
+    mapImg.style.transform = t;
+    canvas.style.transform = t;
+    document.getElementById('zoomLabel').textContent = Math.round(view.scale*100) + '%';
+}
+function fitView() {
+    if (!mapNaturalW) return;
+    const w = wrap.clientWidth, h = wrap.clientHeight;
+    const s = Math.min(w / mapNaturalW, h / mapNaturalH);
+    view.scale = s;
+    view.x = (w - mapNaturalW * s) / 2;
+    view.y = (h - mapNaturalH * s) / 2;
+    applyTransform();
+}
+function screenToWorld(sx, sy) {
+    const rect = wrap.getBoundingClientRect();
+    const x = (sx - rect.left - view.x) / view.scale;
+    const y = (sy - rect.top  - view.y) / view.scale;
+    return { x, y };
+}
+function zoomAt(sx, sy, factor) {
+    const w = screenToWorld(sx, sy);
+    view.scale *= factor;
+    view.scale = Math.max(0.05, Math.min(20, view.scale));
+    const rect = wrap.getBoundingClientRect();
+    view.x = (sx - rect.left) - w.x * view.scale;
+    view.y = (sy - rect.top)  - w.y * view.scale;
+    applyTransform();
+}
+
+// ----- RENDER -----
+function render() {
+    if (!mapNaturalW) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (const s of state.shapes) drawShape(s);
+    if (drawing) drawShape(drawing, true);
+    if (chainPoints.length) drawChainPreview();
+    if (linePointFirst) drawLineFirstMarker();
+}
+function drawShape(s, isPreview=false) {
+    ctx.save();
+    ctx.strokeStyle = s.stroke || '#fff';
+    ctx.fillStyle = s.fill || 'rgba(0,0,0,0)';
+    ctx.lineWidth = s.width || 2;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    if (isPreview) ctx.globalAlpha = 0.7;
+
+    switch(s.type) {
+        case 'point':
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, (s.width||3)*1.8, 0, Math.PI*2);
+            ctx.fillStyle = s.stroke;
+            ctx.fill();
+            ctx.lineWidth = 1.5; ctx.strokeStyle = '#fff';
+            ctx.stroke();
+            break;
+        case 'line':
+            ctx.beginPath();
+            ctx.moveTo(s.x1, s.y1); ctx.lineTo(s.x2, s.y2);
+            ctx.stroke();
+            break;
+        case 'rect':
+        case 'square':
+            ctx.beginPath();
+            ctx.rect(s.x, s.y, s.w, s.h);
+            if (s.useFill) ctx.fill();
+            ctx.stroke();
+            break;
+        case 'circle':
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+            if (s.useFill) ctx.fill();
+            ctx.stroke();
+            break;
+        case 'freedraw':
+            if (s.points.length < 2) break;
+            ctx.beginPath();
+            ctx.moveTo(s.points[0].x, s.points[0].y);
+            for (let i=1;i<s.points.length;i++) ctx.lineTo(s.points[i].x, s.points[i].y);
+            ctx.stroke();
+            break;
+        case 'chain':
+            if (s.points.length < 2) break;
+            ctx.beginPath();
+            ctx.moveTo(s.points[0].x, s.points[0].y);
+            for (let i=1;i<s.points.length;i++) ctx.lineTo(s.points[i].x, s.points[i].y);
+            ctx.stroke();
+            for (const p of s.points) {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, (s.width||3)*1.6, 0, Math.PI*2);
+                ctx.fillStyle = s.stroke; ctx.fill();
+                ctx.lineWidth = 1.5; ctx.strokeStyle = '#fff'; ctx.stroke();
+            }
+            break;
+        case 'emoji':
+            ctx.font = `${s.size}px serif`;
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(s.emoji, s.x, s.y);
+            break;
+        case 'text':
+            ctx.font = `${s.size}px 'Segoe UI', sans-serif`;
+            ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+            ctx.fillStyle = s.stroke;
+            ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+            ctx.lineWidth = 3;
+            ctx.strokeText(s.text, s.x, s.y);
+            ctx.fillText(s.text, s.x, s.y);
+            break;
+    }
+    ctx.restore();
+}
+function drawChainPreview() {
+    ctx.save();
+    ctx.strokeStyle = stroke; ctx.lineWidth = strokeWidth;
+    ctx.setLineDash([6,4]);
+    ctx.beginPath();
+    ctx.moveTo(chainPoints[0].x, chainPoints[0].y);
+    for (let i=1;i<chainPoints.length;i++) ctx.lineTo(chainPoints[i].x, chainPoints[i].y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    for (const p of chainPoints) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, strokeWidth*1.6, 0, Math.PI*2);
+        ctx.fillStyle = stroke; ctx.fill();
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+    }
+    ctx.restore();
+}
+function drawLineFirstMarker() {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(linePointFirst.x, linePointFirst.y, strokeWidth*1.6, 0, Math.PI*2);
+    ctx.fillStyle = stroke; ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.restore();
+}
+
+// ----- HIT TEST -----
+function dist(ax,ay,bx,by){ return Math.hypot(ax-bx,ay-by); }
+function distToSegment(px,py,x1,y1,x2,y2){
+    const dx=x2-x1, dy=y2-y1;
+    const len2=dx*dx+dy*dy || 1;
+    let t=((px-x1)*dx + (py-y1)*dy)/len2;
+    t=Math.max(0,Math.min(1,t));
+    return dist(px,py, x1+t*dx, y1+t*dy);
+}
+function hitTest(wx, wy) {
+    const tol = 8 / view.scale;
+    for (let i = state.shapes.length - 1; i >= 0; i--) {
+        const s = state.shapes[i];
+        const w = (s.width||2) + tol;
+        switch(s.type) {
+            case 'point':
+                if (dist(wx,wy,s.x,s.y) <= w*2) return i; break;
+            case 'line':
+                if (distToSegment(wx,wy,s.x1,s.y1,s.x2,s.y2) <= w) return i; break;
+            case 'rect': case 'square': {
+                const x1=s.x, y1=s.y, x2=s.x+s.w, y2=s.y+s.h;
+                if (s.useFill) { if (wx>=Math.min(x1,x2)&&wx<=Math.max(x1,x2)&&wy>=Math.min(y1,y2)&&wy<=Math.max(y1,y2)) return i; }
+                else {
+                    if (distToSegment(wx,wy,x1,y1,x2,y1)<=w||
+                        distToSegment(wx,wy,x2,y1,x2,y2)<=w||
+                        distToSegment(wx,wy,x2,y2,x1,y2)<=w||
+                        distToSegment(wx,wy,x1,y2,x1,y1)<=w) return i;
+                }
+                break;
+            }
+            case 'circle': {
+                const d=dist(wx,wy,s.x,s.y);
+                if (s.useFill) { if (d<=s.r) return i; }
+                else { if (Math.abs(d-s.r)<=w) return i; }
+                break;
+            }
+            case 'freedraw': case 'chain':
+                for (let k=1;k<s.points.length;k++){
+                    if (distToSegment(wx,wy,s.points[k-1].x,s.points[k-1].y,s.points[k].x,s.points[k].y)<=w) return i;
+                }
+                break;
+            case 'emoji':
+                if (dist(wx,wy,s.x,s.y) <= s.size*0.6) return i; break;
+            case 'text':
+                if (wx>=s.x && wx<=s.x+s.text.length*s.size*0.6 && wy>=s.y && wy<=s.y+s.size) return i; break;
+        }
+    }
+    return -1;
+}
+
+// ----- INPUT -----
+wrap.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    const w = screenToWorld(e.clientX, e.clientY);
+
+    if (spaceDown) {
+        isPanning = true;
+        panStart = { mx: e.clientX, my: e.clientY, vx: view.x, vy: view.y };
+        wrap.style.cursor = 'grabbing';
+        return;
+    }
+
+    if (tool === 'select') {
+        const idx = hitTest(w.x, w.y);
+        if (idx >= 0) {
+            const s = state.shapes[idx];
+            drawing = { dragIdx: idx, startW: w, orig: JSON.parse(JSON.stringify(s)) };
+        }
+        return;
+    }
+
+    if (tool === 'erase') {
+        const idx = hitTest(w.x, w.y);
+        if (idx >= 0) { pushHistory(); state.shapes.splice(idx,1); save(); render(); }
+        return;
+    }
+
+    if (tool === 'point') {
+        pushHistory();
+        state.shapes.push({ type:'point', x:w.x, y:w.y, stroke, width:strokeWidth });
+        save(); render(); return;
+    }
+
+    if (tool === 'line') {
+        if (!linePointFirst) { linePointFirst = w; render(); }
+        else {
+            pushHistory();
+            state.shapes.push({ type:'line', x1:linePointFirst.x, y1:linePointFirst.y, x2:w.x, y2:w.y, stroke, width:strokeWidth });
+            linePointFirst = null; save(); render();
+        }
+        return;
+    }
+
+    if (tool === 'chain') {
+        chainPoints.push(w);
+        render();
+        return;
+    }
+
+    if (tool === 'freedraw') {
+        freePoints = [w];
+        drawing = { type:'freedraw', points: freePoints, stroke, width: strokeWidth };
+        return;
+    }
+
+    if (tool === 'rect' || tool === 'square' || tool === 'circle') {
+        drawing = { type: tool, _startX: w.x, _startY: w.y, stroke, fill, useFill, width: strokeWidth };
+        if (tool === 'circle') { drawing.x = w.x; drawing.y = w.y; drawing.r = 0; }
+        else { drawing.x = w.x; drawing.y = w.y; drawing.w = 0; drawing.h = 0; }
+        return;
+    }
+
+    if (tool === 'emoji') {
+        pushHistory();
+        state.shapes.push({ type:'emoji', x:w.x, y:w.y, emoji:selectedEmoji, size:emojiSize });
+        save(); render(); return;
+    }
+
+    if (tool === 'text') {
+        const t = prompt('Text:');
+        if (!t) return;
+        pushHistory();
+        state.shapes.push({ type:'text', x:w.x, y:w.y, text:t, size:emojiSize, stroke });
+        save(); render(); return;
+    }
+});
+
+wrap.addEventListener('mousemove', (e) => {
+    const w = screenToWorld(e.clientX, e.clientY);
+    document.getElementById('coords').textContent = `${Math.round(w.x)}, ${Math.round(w.y)}`;
+
+    if (isPanning) {
+        view.x = panStart.vx + (e.clientX - panStart.mx);
+        view.y = panStart.vy + (e.clientY - panStart.my);
+        applyTransform();
+        return;
+    }
+
+    if (!drawing) return;
+
+    if (drawing.dragIdx !== undefined) {
+        const dx = w.x - drawing.startW.x;
+        const dy = w.y - drawing.startW.y;
+        const s = state.shapes[drawing.dragIdx];
+        const o = drawing.orig;
+        if (o.type==='point' || o.type==='circle' || o.type==='emoji' || o.type==='text') {
+            s.x = o.x + dx; s.y = o.y + dy;
+        } else if (o.type==='line') {
+            s.x1=o.x1+dx; s.y1=o.y1+dy; s.x2=o.x2+dx; s.y2=o.y2+dy;
+        } else if (o.type==='rect' || o.type==='square') {
+            s.x = o.x + dx; s.y = o.y + dy;
+        } else if (o.type==='freedraw' || o.type==='chain') {
+            s.points = o.points.map(p => ({x:p.x+dx, y:p.y+dy}));
+        }
+        render();
+        return;
+    }
+
+    if (drawing.type === 'freedraw') {
+        freePoints.push(w); render(); return;
+    }
+    if (drawing.type === 'rect') {
+        drawing.x = Math.min(w.x, drawing._startX);
+        drawing.y = Math.min(w.y, drawing._startY);
+        drawing.w = Math.abs(w.x - drawing._startX);
+        drawing.h = Math.abs(w.y - drawing._startY);
+        render(); return;
+    }
+    if (drawing.type === 'square') {
+        const dx = w.x - drawing._startX, dy = w.y - drawing._startY;
+        const sz = Math.max(Math.abs(dx), Math.abs(dy));
+        drawing.x = drawing._startX + (dx<0 ? -sz : 0);
+        drawing.y = drawing._startY + (dy<0 ? -sz : 0);
+        drawing.w = sz; drawing.h = sz;
+        render(); return;
+    }
+    if (drawing.type === 'circle') {
+        drawing.r = dist(w.x, w.y, drawing._startX, drawing._startY);
+        render(); return;
+    }
+});
+
+wrap.addEventListener('mouseup', () => {
+    if (isPanning) { isPanning = false; wrap.style.cursor = spaceDown ? 'grab' : 'crosshair'; return; }
+    if (!drawing) return;
+    if (drawing.dragIdx !== undefined) {
+        pushHistory(); save(); drawing = null; return;
+    }
+    if (drawing.type === 'freedraw' && freePoints.length > 1) {
+        pushHistory();
+        state.shapes.push({ type:'freedraw', points: freePoints.slice(), stroke, width: strokeWidth });
+    }
+    if (drawing.type === 'rect' || drawing.type === 'square') {
+        if (drawing.w > 2 && drawing.h > 2) {
+            pushHistory();
+            const {_startX,_startY,...clean} = drawing;
+            state.shapes.push(clean);
+        }
+    }
+    if (drawing.type === 'circle') {
+        if (drawing.r > 2) {
+            pushHistory();
+            const {_startX,_startY,...clean} = drawing;
+            state.shapes.push(clean);
+        }
+    }
+    drawing = null; freePoints = [];
+    save(); render();
+});
+
+wrap.addEventListener('dblclick', (e) => {
+    if (tool === 'chain' && chainPoints.length >= 2) {
+        pushHistory();
+        state.shapes.push({ type:'chain', points: chainPoints.slice(), stroke, width: strokeWidth });
+        chainPoints = [];
+        save(); render();
+    }
+});
+
+wrap.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.15 : 1/1.15;
+    zoomAt(e.clientX, e.clientY, factor);
+}, { passive: false });
+
+// ----- KEYBOARD -----
+window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && !spaceDown && !isTyping(e.target)) {
+        spaceDown = true;
+        wrap.style.cursor = 'grab';
+        document.getElementById('panOverlay').classList.add('active');
+        e.preventDefault();
+    }
+    if (e.key === 'Escape') {
+        chainPoints = []; linePointFirst = null; drawing = null; render();
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
+    if (e.key === 'Delete' && tool === 'select') {
+        // no-op (user uses erase tool)
+    }
+});
+window.addEventListener('keyup', (e) => {
+    if (e.code === 'Space') {
+        spaceDown = false;
+        wrap.style.cursor = 'crosshair';
+        document.getElementById('panOverlay').classList.remove('active');
+    }
+});
+function isTyping(el){ return el && (el.tagName==='INPUT'||el.tagName==='TEXTAREA'); }
+
+// ----- TOOLBAR -----
+document.querySelectorAll('[data-tool]').forEach(b => {
+    b.addEventListener('click', () => {
+        tool = b.dataset.tool;
+        document.querySelectorAll('[data-tool]').forEach(x => x.classList.toggle('active', x===b));
+        chainPoints = []; linePointFirst = null; drawing = null;
+        document.getElementById('emojiPanel').classList.toggle('visible', tool==='emoji');
+        render();
+    });
+});
+document.querySelectorAll('[data-map]').forEach(b => {
+    b.addEventListener('click', () => setMap(b.dataset.map));
+});
+document.getElementById('colorPick').addEventListener('input', e => stroke = e.target.value);
+document.getElementById('fillPick').addEventListener('input', e => fill = e.target.value);
+document.getElementById('fillToggle').addEventListener('change', e => useFill = e.target.checked);
+document.getElementById('widthRange').addEventListener('input', e => {
+    strokeWidth = +e.target.value;
+    document.getElementById('widthVal').textContent = strokeWidth;
+});
+document.getElementById('emojiRange').addEventListener('input', e => {
+    emojiSize = +e.target.value;
+    document.getElementById('emojiVal').textContent = emojiSize;
+});
+
+// ----- ZOOM BUTTONS -----
+document.getElementById('zoomIn').addEventListener('click', () => {
+    const r = wrap.getBoundingClientRect();
+    zoomAt(r.left + r.width/2, r.top + r.height/2, 1.25);
+});
+document.getElementById('zoomOut').addEventListener('click', () => {
+    const r = wrap.getBoundingClientRect();
+    zoomAt(r.left + r.width/2, r.top + r.height/2, 1/1.25);
+});
+document.getElementById('zoomReset').addEventListener('click', fitView);
+
+// ----- EMOJI PICKER -----
+const grid = document.getElementById('emojiGrid');
+function renderEmoji(filter='') {
+    grid.innerHTML = '';
+    EMOJIS.filter(e => !filter || e.includes(filter)).forEach(em => {
+        const b = document.createElement('button');
+        b.className = 'emoji-btn'; b.textContent = em;
+        b.addEventListener('click', () => {
+            selectedEmoji = em;
+            grid.querySelectorAll('.emoji-btn').forEach(x => x.style.outline='');
+            b.style.outline = '2px solid var(--gold)';
+        });
+        grid.appendChild(b);
+    });
+}
+renderEmoji();
+document.getElementById('emojiSearch').addEventListener('input', e => {
+    const v = e.target.value.trim();
+    if (v.length && [...v][0]) {
+        // if user typed an actual emoji char, use it
+        const ch = [...v][0];
+        if (ch.length > 1 || /\p{Emoji}/u.test(ch)) {
+            selectedEmoji = ch;
+        }
+    }
+    renderEmoji();
+});
+
+// ----- ACTIONS -----
+document.getElementById('undoBtn').addEventListener('click', undo);
+document.getElementById('resetBtn').addEventListener('click', () => {
+    if (!confirm('Wipe ALL drawings? This cannot be undone.')) return;
+    pushHistory();
+    state.shapes = [];
+    save(); render();
+});
+
+document.getElementById('exportPng').addEventListener('click', () => {
+    // Render map + shapes to an offscreen canvas at natural size
+    const off = document.createElement('canvas');
+    off.width = mapNaturalW; off.height = mapNaturalH;
+    const octx = off.getContext('2d');
+    // Map may be cross-origin → try drawing, fall back to shapes-only
+    try {
+        octx.drawImage(mapImg, 0, 0, mapNaturalW, mapNaturalH);
+    } catch(e) { console.warn('map image tainted, exporting shapes only', e); }
+    // Draw shapes on top
+    const oldCtx = window.__ctx; // not used
+    const realCtx = ctx;
+    // Temporarily redirect drawShape's ctx by using same approach
+    // Simpler: replay using octx
+    drawAllOn(octx);
+    try {
+        const url = off.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = url; a.download = `map-${state.mapType}-${Date.now()}.png`;
+        document.body.appendChild(a); a.click(); a.remove();
+    } catch(e) {
+        alert('PNG export blocked because the map image is from another origin (CORS). Use Export JSON instead, or right-click → Save image for the map and re-import.');
+    }
+});
+function drawAllOn(c){
+    const _ctx = ctx;
+    // swap global ctx temporarily
+    window.__origCtx = _ctx;
+    // we cheat: rebind ctx by creating a local renderer
+    const orig = ctx;
+    const proxyDraw = (s) => {
+        const tmp = {
+            save:()=>c.save(), restore:()=>c.restore(),
+            beginPath:()=>c.beginPath(), moveTo:(x,y)=>c.moveTo(x,y), lineTo:(x,y)=>c.lineTo(x,y),
+            arc:(...a)=>c.arc(...a), rect:(...a)=>c.rect(...a),
+            stroke:()=>c.stroke(), fill:()=>c.fill(),
+            fillText:(...a)=>c.fillText(...a), strokeText:(...a)=>c.strokeText(...a),
+            set strokeStyle(v){c.strokeStyle=v;}, set fillStyle(v){c.fillStyle=v;},
+            set lineWidth(v){c.lineWidth=v;}, set font(v){c.font=v;},
+            set textAlign(v){c.textAlign=v;}, set textBaseline(v){c.textBaseline=v;},
+            set lineCap(v){c.lineCap=v;}, set lineJoin(v){c.lineJoin=v;},
+            set globalAlpha(v){c.globalAlpha=v;}
+        };
+    };
+    // Easier path: just inline render against c
+    for (const s of state.shapes) drawShapeOn(c, s);
+}
+function drawShapeOn(c, s) {
+    c.save();
+    c.strokeStyle = s.stroke || '#fff';
+    c.fillStyle = s.fill || 'rgba(0,0,0,0)';
+    c.lineWidth = s.width || 2;
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    switch(s.type) {
+        case 'point':
+            c.beginPath(); c.arc(s.x,s.y,(s.width||3)*1.8,0,Math.PI*2);
+            c.fillStyle = s.stroke; c.fill();
+            c.lineWidth=1.5; c.strokeStyle='#fff'; c.stroke(); break;
+        case 'line':
+            c.beginPath(); c.moveTo(s.x1,s.y1); c.lineTo(s.x2,s.y2); c.stroke(); break;
+        case 'rect': case 'square':
+            c.beginPath(); c.rect(s.x,s.y,s.w,s.h);
+            if (s.useFill) c.fill(); c.stroke(); break;
+        case 'circle':
+            c.beginPath(); c.arc(s.x,s.y,s.r,0,Math.PI*2);
+            if (s.useFill) c.fill(); c.stroke(); break;
+        case 'freedraw':
+            if (s.points.length<2) break;
+            c.beginPath(); c.moveTo(s.points[0].x,s.points[0].y);
+            for (let i=1;i<s.points.length;i++) c.lineTo(s.points[i].x,s.points[i].y);
+            c.stroke(); break;
+        case 'chain':
+            if (s.points.length<2) break;
+            c.beginPath(); c.moveTo(s.points[0].x,s.points[0].y);
+            for (let i=1;i<s.points.length;i++) c.lineTo(s.points[i].x,s.points[i].y);
+            c.stroke();
+            for (const p of s.points){
+                c.beginPath(); c.arc(p.x,p.y,(s.width||3)*1.6,0,Math.PI*2);
+                c.fillStyle=s.stroke; c.fill();
+                c.lineWidth=1.5; c.strokeStyle='#fff'; c.stroke();
+            } break;
+        case 'emoji':
+            c.font = `${s.size}px serif`;
+            c.textAlign='center'; c.textBaseline='middle';
+            c.fillText(s.emoji, s.x, s.y); break;
+        case 'text':
+            c.font = `${s.size}px 'Segoe UI', sans-serif`;
+            c.textAlign='left'; c.textBaseline='top';
+            c.fillStyle = s.stroke; c.strokeStyle='rgba(0,0,0,0.7)'; c.lineWidth=3;
+            c.strokeText(s.text, s.x, s.y); c.fillText(s.text, s.x, s.y); break;
+    }
+    c.restore();
+}
+
+document.getElementById('exportJson').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify({mapType:state.mapType, shapes:state.shapes}, null, 2)],
+                         {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `map-plan-${Date.now()}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+});
+document.getElementById('importJson').addEventListener('click', () => {
+    document.getElementById('importFile').click();
+});
+document.getElementById('importFile').addEventListener('change', (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+        try {
+            const d = JSON.parse(r.result);
+            pushHistory();
+            if (d.mapType) setMap(d.mapType);
+            if (Array.isArray(d.shapes)) state.shapes = d.shapes;
+            save(); render();
+        } catch(err) { alert('Invalid JSON'); }
+    };
+    r.readAsText(f);
+});
+
+// ----- INIT -----
+window.addEventListener('resize', () => { /* no auto-fit on resize to preserve work */ });
+load();
+mapImg.crossOrigin = 'anonymous';   // best-effort for PNG export
+setMap(state.mapType);
+</script>
+</body>
+</html>

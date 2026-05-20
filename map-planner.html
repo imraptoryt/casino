@@ -5,7 +5,8 @@
 <title>Map Planner</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Cinzel:wght@500;700&family=JetBrains+Mono:wght@500&family=Caveat:wght@600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Cinzel:wght@500;700&family=JetBrains+Mono:wght@500&family=Caveat:wght@600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
     :root {
         --grn: #3ddc84;
@@ -24,9 +25,11 @@
     body, html {
         margin: 0; padding: 0; height: 100%; width: 100%;
         font-family: 'Inter', 'Segoe UI', sans-serif;
-        font-weight: 600;
+        font-weight: 500;
         background: var(--bg-dark); color: var(--text);
         overflow: hidden; user-select: none;
+        font-size: 13px;
+        letter-spacing: 0;
     }
     #toolbar, #emojiPanel, #status, #zoomCtrl, #showToolbar {
         font-family: 'Inter', 'Segoe UI', sans-serif;
@@ -52,16 +55,17 @@
     /* --- TOOLBAR --- */
     #toolbar {
         position: absolute; top: 12px; left: 12px;
-        background: var(--panel);
-        border: 1px solid var(--grn);
-        border-radius: 8px;
-        padding: 10px;
-        display: flex; flex-direction: column; gap: 6px;
+        background: rgba(8, 18, 12, 0.92);
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(61,220,132,0.2);
+        border-radius: 10px;
+        padding: 12px;
+        display: flex; flex-direction: column; gap: 4px;
         z-index: 100;
-        box-shadow: 0 6px 24px rgba(0,0,0,0.7), 0 0 0 1px rgba(61,220,132,0.15);
-        width: 250px;
+        box-shadow: 0 8px 28px rgba(0,0,0,0.45);
+        width: 240px;
         min-width: 220px;
-        max-width: 480px;
+        max-width: 460px;
         max-height: calc(100vh - 24px);
         overflow-y: auto;
         resize: horizontal;
@@ -96,32 +100,31 @@
     #tb-toggle:hover { background: rgba(61,220,132,0.15); border-color: var(--grn); }
 
     #toolbar h3 {
-        margin: 6px 0 4px 0; color: var(--grn);
-        font-size: 12px; letter-spacing: 2px;
-        font-weight: 800;
-        border-bottom: 1px solid var(--border); padding-bottom: 3px;
+        margin: 10px 0 6px 0; color: var(--muted);
+        font-size: 11px; letter-spacing: 0.5px;
+        font-weight: 600;
         text-transform: uppercase;
+        border: none; padding: 0;
     }
-    .label { font-weight: 700; }
-    #tb-title { font-weight: 800; }
+    .label { font-weight: 500; color: var(--muted); font-size: 11px; margin-top: 6px; }
+    #tb-title { font-weight: 600; font-size: 13px; letter-spacing: 0.3px; }
     .tool-row { display: flex; gap: 4px; flex-wrap: wrap; }
     .tool-btn {
-        background: #0e1f15; color: var(--text);
-        border: 1px solid var(--border); padding: 7px 10px;
-        cursor: pointer; border-radius: 4px;
-        font-size: 12px; min-width: 38px;
-        transition: 0.15s;
+        background: #102218; color: var(--text);
+        border: 1px solid transparent; padding: 7px 10px;
+        cursor: pointer; border-radius: 6px;
+        font-size: 13px; min-width: 36px;
+        transition: 0.12s;
         font-family: 'Inter', 'Segoe UI', sans-serif;
-        font-weight: 700;
+        font-weight: 500;
     }
-    .tool-btn:hover { background: #173024; border-color: var(--grn); color: var(--grn-bright); }
+    .tool-btn:hover { background: #1a3325; color: var(--grn-bright); }
     .tool-btn.active {
-        background: var(--grn); color: #021b0c; border-color: var(--grn-bright);
-        font-weight: bold;
-        box-shadow: 0 0 8px rgba(61,220,132,0.5);
+        background: var(--grn); color: #021b0c;
+        font-weight: 600;
     }
-    .tool-btn.danger { border-color: #5c1a1a; color: #ff8888; }
-    .tool-btn.danger:hover { background: #2a0c0c; border-color: var(--danger); color: var(--danger); }
+    .tool-btn.danger { color: #ff8888; }
+    .tool-btn.danger:hover { background: #2a0c0c; color: var(--danger); }
 
     .label { font-size: 11px; color: var(--muted); margin-top: 4px; }
     input[type="color"] {
@@ -325,6 +328,7 @@
             <button class="tool-btn" data-tool="square" data-i18n-title="t_square" title="Square">◻</button>
             <button class="tool-btn" data-tool="circle" data-i18n-title="t_circle" title="Circle">○</button>
             <button class="tool-btn" data-tool="chain" data-i18n-title="t_chain" title="Chain — click points, press Enter / Finish / double-click to confirm">⛓</button>
+            <button class="tool-btn" data-tool="polygon" data-i18n-title="t_polygon" title="Polygon — click points, Enter to close">⬠</button>
             <button class="tool-btn" data-tool="cross" data-i18n-title="t_cross" title="X marker">✕</button>
             <button class="tool-btn" data-tool="plus" data-i18n-title="t_plus" title="Plus marker">＋</button>
             <button class="tool-btn" data-tool="emoji" data-i18n-title="t_emoji" title="Emoji">😀</button>
@@ -333,7 +337,7 @@
         </div>
 
         <div id="chainConfirmRow" style="display:none;" class="tool-row">
-            <button class="tool-btn" id="finishChain" style="flex:1; background:var(--grn); color:#021b0c; font-weight:bold;" data-i18n="finishChain">✓ Finish chain (Enter)</button>
+            <button class="tool-btn" id="finishChain" style="flex:1; background:var(--grn); color:#021b0c; font-weight:600;" data-i18n="finishChain">✓ Finish (Enter)</button>
             <button class="tool-btn danger" id="cancelChain" data-i18n="cancel">Cancel</button>
         </div>
 
@@ -390,17 +394,21 @@
             <option value="Impact">Impact</option>
         </select>
 
-        <div class="divider"></div>
         <h3 data-i18n="actions">ACTIONS</h3>
         <div class="tool-row">
             <button class="tool-btn" id="undoBtn" data-i18n-title="undo" title="Undo (Ctrl+Z)"><span data-i18n="undo">↶ Undo</span></button>
-            <button class="tool-btn" id="exportPng" data-i18n="exportPng">Export PNG</button>
         </div>
+
+        <h3 data-i18n="saveLoad">SAVE & LOAD</h3>
         <div class="tool-row">
-            <button class="tool-btn" id="exportJson" data-i18n="exportJson">Export JSON</button>
-            <button class="tool-btn" id="importJson" data-i18n="importJson">Import JSON</button>
+            <button class="tool-btn" id="exportPng" data-i18n="exportPng">PNG</button>
+            <button class="tool-btn" id="exportPdf" data-i18n="exportPdf">PDF</button>
+            <button class="tool-btn" id="exportJson" data-i18n="exportJson">JSON</button>
+            <button class="tool-btn" id="importJson" data-i18n="importJson">Import</button>
         </div>
         <input type="file" id="importFile" accept="application/json" style="display:none;">
+
+        <h3 data-i18n="dangerZone">DANGER ZONE</h3>
         <button class="tool-btn danger" id="resetBtn" data-i18n="resetAll">⚠ Reset All</button>
         </div>
     </div>
@@ -492,9 +500,11 @@ const I18N = {
         t_select: 'Select / Move', t_point: 'Point', t_line: 'Line — click two points',
         t_freedraw: 'Free draw', t_rect: 'Rectangle', t_square: 'Square', t_circle: 'Circle',
         t_chain: 'Chain — click points, Enter / dbl-click to finish',
+        t_polygon: 'Polygon — click points, Enter to close',
         t_cross: 'X marker', t_plus: 'Plus marker', t_emoji: 'Emoji', t_text: 'Text',
         t_erase: 'Click a shape to delete it',
-        finishChain: '✓ Finish chain (Enter)', cancel: 'Cancel',
+        finishChain: '✓ Finish (Enter)', cancel: 'Cancel',
+        saveLoad: 'SAVE & LOAD', dangerZone: 'DANGER ZONE', exportPdf: 'PDF',
         lineStyle: 'Line style', solid: 'Solid', dashed: 'Dashed', dotted: 'Dotted', dotdash: 'Dot-dash',
         strokeColor: 'Stroke color', fill: 'Fill',
         strokeWidth: 'Stroke width', textSize: 'Emoji / text size', textFont: 'Text font',
@@ -517,9 +527,11 @@ const I18N = {
         t_select: 'Sélectionner / Déplacer', t_point: 'Point', t_line: 'Ligne — cliquez deux points',
         t_freedraw: 'Dessin libre', t_rect: 'Rectangle', t_square: 'Carré', t_circle: 'Cercle',
         t_chain: 'Chaîne — cliquez les points, Entrée / double-clic pour finir',
+        t_polygon: 'Polygone — cliquez les points, Entrée pour fermer',
         t_cross: 'Marqueur X', t_plus: 'Marqueur +', t_emoji: 'Émoji', t_text: 'Texte',
         t_erase: 'Cliquez une forme pour la supprimer',
-        finishChain: '✓ Terminer la chaîne (Entrée)', cancel: 'Annuler',
+        finishChain: '✓ Terminer (Entrée)', cancel: 'Annuler',
+        saveLoad: 'SAUVEGARDE', dangerZone: 'ZONE DANGER', exportPdf: 'PDF',
         lineStyle: 'Style de ligne', solid: 'Plein', dashed: 'Tirets', dotted: 'Pointillé', dotdash: 'Point-tiret',
         strokeColor: 'Couleur du trait', fill: 'Remplir',
         strokeWidth: 'Épaisseur', textSize: 'Taille émoji / texte', textFont: 'Police de texte',
@@ -696,7 +708,7 @@ function boundsOf(s) {
                           return {x:x1-pad, y:y1-pad, w:Math.abs(s.x2-s.x1)+pad*2, h:Math.abs(s.y2-s.y1)+pad*2}; }
         case 'rect': case 'square': return {x:s.x-pad, y:s.y-pad, w:s.w+pad*2, h:s.h+pad*2};
         case 'circle': return {x:s.x-s.r-pad, y:s.y-s.r-pad, w:s.r*2+pad*2, h:s.r*2+pad*2};
-        case 'freedraw': case 'chain': {
+        case 'freedraw': case 'chain': case 'polygon': {
             let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
             for (const p of s.points){ if(p.x<minX)minX=p.x; if(p.y<minY)minY=p.y; if(p.x>maxX)maxX=p.x; if(p.y>maxY)maxY=p.y; }
             return {x:minX-pad, y:minY-pad, w:(maxX-minX)+pad*2, h:(maxY-minY)+pad*2};
@@ -906,6 +918,14 @@ function drawShape(c, s, isPreview=false) {
             }
             c.stroke();
             break;
+        case 'polygon':
+            if (s.points.length < 3) break;
+            c.beginPath(); c.moveTo(s.points[0].x, s.points[0].y);
+            for (let i=1;i<s.points.length;i++) c.lineTo(s.points[i].x, s.points[i].y);
+            c.closePath();
+            if (s.useFill) c.fill();
+            c.stroke();
+            break;
         case 'chain':
             if (s.points.length < 2) break;
             c.beginPath(); c.moveTo(s.points[0].x, s.points[0].y);
@@ -965,6 +985,15 @@ function drawChainPreview() {
     ctx.beginPath();
     ctx.moveTo(chainPoints[0].x, chainPoints[0].y);
     for (let i=1;i<chainPoints.length;i++) ctx.lineTo(chainPoints[i].x, chainPoints[i].y);
+    if (tool === 'polygon' && chainPoints.length >= 3) {
+        ctx.lineTo(chainPoints[0].x, chainPoints[0].y);
+        if (useFill) {
+            ctx.save();
+            ctx.fillStyle = hexToRgba(fill, FILL_ALPHA * 0.6);
+            ctx.fill();
+            ctx.restore();
+        }
+    }
     ctx.stroke();
     ctx.setLineDash([]);
     for (const p of chainPoints) {
@@ -1022,6 +1051,24 @@ function hitTest(wx, wy) {
                     if (distToSegment(wx,wy,s.points[k-1].x,s.points[k-1].y,s.points[k].x,s.points[k].y)<=w) return i;
                 }
                 break;
+            case 'polygon': {
+                // edges
+                for (let k=0;k<s.points.length;k++){
+                    const p1=s.points[k], p2=s.points[(k+1)%s.points.length];
+                    if (distToSegment(wx,wy,p1.x,p1.y,p2.x,p2.y)<=w) return i;
+                }
+                // interior (if filled)
+                if (s.useFill) {
+                    let inside=false;
+                    for (let k=0,j=s.points.length-1;k<s.points.length;j=k++) {
+                        const pi=s.points[k], pj=s.points[j];
+                        if (((pi.y>wy)!==(pj.y>wy)) &&
+                            (wx < (pj.x-pi.x)*(wy-pi.y)/(pj.y-pi.y)+pi.x)) inside=!inside;
+                    }
+                    if (inside) return i;
+                }
+                break;
+            }
             case 'emoji': if (dist(wx,wy,s.x,s.y) <= s.size*0.6) return i; break;
             case 'cross':
             case 'plus':  if (dist(wx,wy,s.x,s.y) <= s.size + w) return i; break;
@@ -1106,7 +1153,7 @@ wrap.addEventListener('mousedown', (e) => {
         }
         return;
     }
-    if (tool === 'chain') {
+    if (tool === 'chain' || tool === 'polygon') {
         const sp = snapPoint(w);
         chainPoints.push({x:sp.x, y:sp.y});
         updateChainConfirmUI();
@@ -1195,7 +1242,7 @@ wrap.addEventListener('mousemove', (e) => {
                 s.x1=o.x1+dx; s.y1=o.y1+dy; s.x2=o.x2+dx; s.y2=o.y2+dy;
             } else if (o.type==='rect'||o.type==='square') {
                 s.x = o.x + dx; s.y = o.y + dy;
-            } else if (o.type==='freedraw'||o.type==='chain') {
+            } else if (o.type==='freedraw'||o.type==='chain'||o.type==='polygon') {
                 s.points = o.points.map(p => ({x:p.x+dx, y:p.y+dy}));
             }
         }
@@ -1281,10 +1328,20 @@ wrap.addEventListener('mouseup', () => {
 });
 
 function finishChain() {
-    if (tool !== 'chain') return;
+    if (tool !== 'chain' && tool !== 'polygon') return;
     if (chainPoints.length < 2) { chainPoints = []; updateChainConfirmUI(); render(); return; }
     pushHistory();
-    state.shapes.push({ type:'chain', points: chainPoints.slice(), stroke, width: strokeWidth, lineStyle });
+    if (tool === 'polygon' && chainPoints.length >= 3) {
+        state.shapes.push({
+            type:'polygon', points: chainPoints.slice(),
+            stroke, fill, useFill, width: strokeWidth, lineStyle
+        });
+    } else {
+        state.shapes.push({
+            type:'chain', points: chainPoints.slice(),
+            stroke, width: strokeWidth, lineStyle
+        });
+    }
     chainPoints = [];
     updateChainConfirmUI();
     save(); render();
@@ -1296,11 +1353,11 @@ function cancelChain() {
 }
 function updateChainConfirmUI() {
     const row = document.getElementById('chainConfirmRow');
-    row.style.display = (tool === 'chain' && chainPoints.length > 0) ? 'flex' : 'none';
+    row.style.display = ((tool === 'chain' || tool === 'polygon') && chainPoints.length > 0) ? 'flex' : 'none';
 }
 
 wrap.addEventListener('dblclick', (e) => {
-    if (tool === 'chain') { finishChain(); return; }
+    if (tool === 'chain' || tool === 'polygon') { finishChain(); return; }
     if (tool === 'select') {
         const w = screenToWorld(e.clientX, e.clientY);
         const idx = hitTest(w.x, w.y);
@@ -1328,7 +1385,9 @@ window.addEventListener('keydown', (e) => {
     }
     if (e.key === 'Escape') { cancelChain(); linePointFirst = null; drawing = null; render(); }
     if ((e.key === 'Enter') && !isTyping(e.target)) {
-        if (tool === 'chain' && chainPoints.length >= 2) { e.preventDefault(); finishChain(); }
+        if ((tool === 'chain' || tool === 'polygon') && chainPoints.length >= 2) {
+            e.preventDefault(); finishChain();
+        }
     }
     if ((e.ctrlKey||e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
     if ((e.key === 'Delete' || e.key === 'Backspace') && !isTyping(e.target) && selectedIdxs.size) {
@@ -1428,7 +1487,8 @@ new ResizeObserver(() => { if (!tb.classList.contains('collapsed')) saveUI(); })
 
 document.querySelectorAll('[data-tool]').forEach(b => {
     b.addEventListener('click', () => {
-        if (tool === 'chain' && chainPoints.length >= 2 && b.dataset.tool !== 'chain') finishChain();
+        const wasMulti = (tool === 'chain' || tool === 'polygon');
+        if (wasMulti && chainPoints.length >= 2 && b.dataset.tool !== tool) finishChain();
         else chainPoints = [];
         tool = b.dataset.tool;
         document.querySelectorAll('[data-tool]').forEach(x => x.classList.toggle('active', x===b));
@@ -1646,17 +1706,7 @@ document.getElementById('resetBtn').addEventListener('click', () => {
 });
 
 document.getElementById('exportPng').addEventListener('click', () => {
-    const off = document.createElement('canvas');
-    off.width = mapNaturalW; off.height = mapNaturalH;
-    const octx = off.getContext('2d');
-    if (mapLoaded) {
-        try { octx.drawImage(mapImg, 0, 0, mapNaturalW, mapNaturalH); }
-        catch(e) {}
-    } else {
-        octx.fillStyle = '#06160e';
-        octx.fillRect(0,0,off.width,off.height);
-    }
-    for (const s of state.shapes) drawShape(octx, s);
+    const off = buildExportCanvas();
     try {
         const url = off.toDataURL('image/png');
         const a = document.createElement('a');
@@ -1664,6 +1714,36 @@ document.getElementById('exportPng').addEventListener('click', () => {
         document.body.appendChild(a); a.click(); a.remove();
     } catch(e) {
         alert('PNG export blocked because the map image host does not allow cross-origin canvas reads. Use Export JSON instead.');
+    }
+});
+
+function buildExportCanvas() {
+    const off = document.createElement('canvas');
+    off.width = mapNaturalW; off.height = mapNaturalH;
+    const octx = off.getContext('2d');
+    if (mapLoaded) {
+        try { octx.drawImage(mapImg, 0, 0, mapNaturalW, mapNaturalH); } catch(e) {}
+    } else {
+        octx.fillStyle = '#06160e';
+        octx.fillRect(0, 0, off.width, off.height);
+    }
+    for (const s of state.shapes) drawShape(octx, s);
+    return off;
+}
+
+document.getElementById('exportPdf').addEventListener('click', () => {
+    if (!window.jspdf) { alert('PDF library not loaded yet — try again in a moment.'); return; }
+    const off = buildExportCanvas();
+    try {
+        const dataUrl = off.toDataURL('image/png');
+        const w = off.width, h = off.height;
+        const orientation = w >= h ? 'landscape' : 'portrait';
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF({ orientation, unit: 'pt', format: [w, h] });
+        pdf.addImage(dataUrl, 'PNG', 0, 0, w, h);
+        pdf.save(`map-${state.mapType}-${Date.now()}.pdf`);
+    } catch(e) {
+        alert('PDF export blocked because the map image host does not allow cross-origin canvas reads. JSON export still works.');
     }
 });
 
